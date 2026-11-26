@@ -161,17 +161,21 @@ export default function RotorDial({
             strokeWidth="1.5"
           />
         </g>
-        {row.marked && (
+        <g data-testid="ten-oclock-marker" pointerEvents="none">
+          <line x1="43.2" y1="109.5" x2="60.6" y2="119.5" stroke="#29d17d" strokeWidth="3" />
+          <text x="38" y="100" fill="#29d17d" fontSize="12" fontWeight="700">10:00</text>
+        </g>
+        {
           <g
-            data-testid="defect-marker"
+            data-testid={row.marked ? "defect-marker" : "tracked-roller-marker"}
             opacity={session.sync === "synced" ? 1 : 0.5}
           >
             <circle
               cx={roller.x}
               cy={roller.y}
               r="10"
-              fill="#ff3045"
-              stroke="#ffb5bd"
+              fill={row.marked ? "#ff3045" : "#ffd343"}
+              stroke={row.marked ? "#ffb5bd" : "#fff9bb"}
               strokeWidth="2"
             />
             <circle
@@ -179,11 +183,11 @@ export default function RotorDial({
               cy={roller.y}
               r="15"
               fill="none"
-              stroke="#ff3045"
+              stroke={row.marked ? "#ff3045" : "#ffd343"}
               strokeWidth="1.5"
             />
           </g>
-        )}
+        }
       </svg>
       <div className="dial-caption">
         <span>
