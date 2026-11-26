@@ -4,7 +4,7 @@ on:
     branches: [main]
   workflow_dispatch:
 permissions:
-  contents: write
+  contents: read
   pages: write
   id-token: write
 concurrency:
@@ -15,16 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Import reviewed source archive (one-time bootstrap)
-        if: hashFiles('BearingTrackerPro-Next-source.zip') != ''
-        run: |
-          unzip -o BearingTrackerPro-Next-source.zip
-          rm BearingTrackerPro-Next-source.zip
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add --all
-          git commit -m 'Import reviewed standalone BearingTrackerPro Next source'
-          git push origin HEAD:main
+
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
