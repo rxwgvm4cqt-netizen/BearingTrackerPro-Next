@@ -177,7 +177,7 @@ export default function App() {
     const updateSignal = () => {
       const signal = getOcrSignal(rpmRef.current, performance.now());
       setOcrSignal(signal.status);
-      if (signal.status === "ocrLost" || signal.status === "ocrWaiting") setOcrRpm(null);
+      if (signal.status === "ocrWaiting") setOcrRpm(null);
     };
     const timer = setInterval(updateSignal, 250);
     return () => clearInterval(timer);
@@ -255,16 +255,16 @@ export default function App() {
             ),
           };
         const input = getOcrSignal(rpmRef.current, now);
-        if (s.mode === "ocr" && (input.status === "ocrLost" || input.status === "ocrWaiting"))
-          // Freeze integration while retaining the user's run intent. A fresh measured
-          // value resumes it; Stop/mode change still clears that intent explicitly.
+        if (s.mode === "ocr" && input.status === "ocrWaiting")
+          // No motion before a confirmed measurement. Once acquired, hold the last
+          // measured RPM through read gaps; explicit Stop always clears run intent.
           return s.sync === "uncertain" ? d : { ...d, session: { ...s, sync: "uncertain" } };
         const rpm =
           s.mode === "manual" ? s.manualRpm : input.rpm;
         // Kinematic angles are stored in rotor-side coordinates; input direction is viewed.
         const canonical = {
           ...s,
-          ...(s.mode === "ocr" && input.status === "ocrHeld" ? { sync: "uncertain" } : {}),
+          ...(s.mode === "ocr" && (input.status === "ocrHeld" || input.status === "ocrLost") ? { sync: "uncertain" } : {}),
           direction:
             view === 1 ? s.direction : s.direction === "cw" ? "ccw" : "cw",
         };
