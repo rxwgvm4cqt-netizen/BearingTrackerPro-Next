@@ -62,6 +62,13 @@ try {
     .getByText(t("offlineReady"), { exact: true })
     .waitFor({ timeout: 30000 });
   console.log("PASS: initial app + complete offline package");
+  const metricBox = await page.locator(".tracking-metrics").boundingBox();
+  const rotorBox = await page.getByTestId("rotor-dial").boundingBox();
+  assert.ok(metricBox.x + metricBox.width <= rotorBox.x);
+  assert.equal(await page.locator(".jog-button, .jog-speed-control").count(), 0);
+  assert.ok((await page.locator(".factor-readout").boundingBox()).height < 60);
+  console.log("PASS: compact values left of rotor, compact factor, no JOG controls");
+
   const button = (name) => page.getByRole("button", { name, exact: true });
   const value = async (label) =>
     page

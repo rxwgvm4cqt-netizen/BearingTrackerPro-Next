@@ -21,38 +21,6 @@ function Fingerprint() {
   );
 }
 
-function JogButton({ direction, disabled, onJog, children }) {
-  return (
-    <button
-      className="control-button jog-button"
-      disabled={disabled}
-      onPointerDown={(e) => {
-        if (e.button !== 0) return;
-        e.preventDefault();
-        e.currentTarget.setPointerCapture(e.pointerId);
-        onJog(direction);
-      }}
-      onPointerUp={(e) => {
-        onJog(0);
-        if (e.currentTarget.hasPointerCapture(e.pointerId))
-          e.currentTarget.releasePointerCapture(e.pointerId);
-      }}
-      onPointerCancel={() => onJog(0)}
-      onLostPointerCapture={() => onJog(0)}
-      onKeyDown={(e) => {
-        if ((e.key === " " || e.key === "Enter") && !e.repeat) {
-          e.preventDefault();
-          onJog(direction);
-        }
-      }}
-      onKeyUp={() => onJog(0)}
-      onBlur={() => onJog(0)}
-    >
-      {children}
-    </button>
-  );
-}
-
 export default function TrackingPage({
   session,
   preset,
@@ -74,11 +42,6 @@ export default function TrackingPage({
   const view = preset.viewingDirection === "generator" ? -1 : 1;
   const factor = activeFactor(preset);
   const running = session.outerRunning || session.cageRunning;
-  const canJog =
-    session.positioning &&
-    !running &&
-    session.mode !== "finger" &&
-    factor !== null;
   return (
     <div className="page page--tracking">
       <header className="tracking-header">
@@ -107,6 +70,25 @@ export default function TrackingPage({
         ))}
       </div>
       <section className="tracking-workspace">
+      <section className="tracking-metrics" aria-label={t("trackingMetrics")}>
+        {[
+          [
+            "rotorAngle",
+            `${normalizeAngle(session.rotorAngle * view).toFixed(2)}°`,
+          ],
+          ["rollerAngle", `${normalizeAngle(row.angle * view).toFixed(2)}°`],
+          ["rotorTurns", ((session.rotorTravel * view) / 360).toFixed(4)],
+          ["rollerTurns", ((row.travel * view) / 360).toFixed(4)],
+        ].map(([key, value]) => (
+          <KPIBox
+            compact
+            key={key}
+            label={t(key)}
+            value={value}
+            meta={t("theoretical")}
+          />
+        ))}
+      </section>
         <div className="tracking-visual-column">
           <RotorDial
             session={session}
@@ -232,64 +214,14 @@ export default function TrackingPage({
             <button className="control-button" onClick={onReset}>
               {t("reset")}
             </button>
-            <button
-              className={`control-button ${session.positioning ? "is-active" : ""}`}
-              disabled={running || session.mode === "finger"}
-              onClick={() =>
-                onChange({ positioning: !session.positioning, jogDirection: 0 })
-              }
-            >
-              {t("positioning")}
-            </button>
             <button className="control-button" onClick={onInterrupt}>
               {t("markUncertain")}
             </button>
-            <JogButton
-              direction={-1}
-              disabled={!canJog}
-              onJog={(v) => onChange({ jogDirection: v })}
-            >
-              ◀
-            </JogButton>
-            <JogButton
-              direction={1}
-              disabled={!canJog}
-              onJog={(v) => onChange({ jogDirection: v })}
-            >
-              ▶
-            </JogButton>
           </div>
-          <label className="jog-speed-control">
-            <span>Jog {session.jogRpm.toFixed(2)} RPM</span>
-            <input
-              type="range"
-              min="0.02"
-              max="1"
-              step="0.02"
-              value={session.jogRpm}
-              onChange={(e) => onChange({ jogRpm: Number(e.target.value) })}
-            />
-          </label>
+
         </aside>
       </section>
-      <section className="kpi-grid">
-        {[
-          [
-            "rotorAngle",
-            `${normalizeAngle(session.rotorAngle * view).toFixed(2)}°`,
-          ],
-          ["rollerAngle", `${normalizeAngle(row.angle * view).toFixed(2)}°`],
-          ["rotorTurns", ((session.rotorTravel * view) / 360).toFixed(4)],
-          ["rollerTurns", ((row.travel * view) / 360).toFixed(4)],
-        ].map(([key, value]) => (
-          <KPIBox
-            key={key}
-            label={t(key)}
-            value={value}
-            meta={t("theoretical")}
-          />
-        ))}
-      </section>
+
 
     </div>
   );

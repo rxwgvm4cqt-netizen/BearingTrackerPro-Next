@@ -51,14 +51,14 @@ test("initial application renders immediately without a login gate", () => {
   assert.ok(html.includes("Presets bearbeiten"));
   assert.ok(!html.includes("login-form"));
 });
-test("preset editor exposes editable numbers, quality, sources and a save button", () => {
+test("preset editor keeps editable numbers and save while hiding quality and sources", () => {
   const html = renderToString(createElement(Preset, props()));
   assert.ok(html.includes('name="rollerCount"'));
   assert.ok(html.includes('name="manualFactor"'));
   assert.ok(html.includes("Preset speichern"));
   assert.ok(!html.includes("readOnly"));
-  assert.ok(html.includes("Datenqualität"));
-  assert.ok(html.includes("Quelle / Nachweis"));
+  assert.ok(!html.includes("Datenqualität"));
+  assert.ok(!html.includes("Quelle / Nachweis"));
 });
 test("unknown roller count is explicitly symbolic and has no invented defect", () => {
   const html = renderToString(createElement(Tracking, props()));
@@ -98,4 +98,13 @@ test("English view and generator-side view render", () => {
 test("references and known movement appear only on analysis", () => {
   assert.ok(!renderToString(createElement(Tracking, props())).includes("Referenzierung &amp; bekannte Bewegung"));
   assert.ok(renderToString(createElement(Analysis, props())).includes("Referenzierung &amp; bekannte Bewegung"));
+});
+
+test("tracking has compact values before the unchanged dial and no JOG controls", () => {
+  const html = renderToString(createElement(Tracking, props()));
+  assert.ok(html.includes("Defekt erkannt"));
+  assert.ok(!html.includes("jog-speed-control"));
+  assert.ok(!html.includes("jog-button"));
+  assert.ok(!html.includes("Positionieren"));
+  assert.ok(html.indexOf("tracking-metrics") < html.indexOf('data-testid="rotor-dial"'));
 });

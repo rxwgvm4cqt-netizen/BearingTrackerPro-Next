@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { QUALITIES, numericFields, validatePreset } from "../data/presets.js";
+import { numericFields, validatePreset } from "../data/presets.js";
 import { activeFactor, theoreticalFactor } from "../engine/kinematics.js";
 
 export default function BearingDataPage({
@@ -74,9 +74,9 @@ export default function BearingDataPage({
       </p>
       <form onSubmit={save} className="page" data-testid="preset-form">
         <section className="editor-grid">
-          {["label", "manufacturer", "bearingType", "dataSource"].map((key) => (
+          {["label", "manufacturer", "bearingType"].map((key) => (
             <label key={key} className="field">
-              <span>{t(key === "dataSource" ? "source" : key)}</span>
+              <span>{t(key)}</span>
               <input
                 value={draft[key] ?? ""}
                 onChange={(e) => update(key, e.target.value)}
@@ -120,38 +120,6 @@ export default function BearingDataPage({
                   onChange={(e) => numericChange(key, e.target.value)}
                 />
               </label>
-              <label className="field">
-                <span>{t("quality")}</span>
-                <select
-                  aria-label={`${t(key)} ${t("quality")}`}
-                  value={draft.quality[key]}
-                  onChange={(e) =>
-                    update("quality", {
-                      ...draft.quality,
-                      [key]: e.target.value,
-                    })
-                  }
-                >
-                  {QUALITIES.map((q) => (
-                    <option key={q} value={q}>
-                      {t(q)}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="field">
-                <span>{t("source")}</span>
-                <input
-                  aria-label={`${t(key)} ${t("source")}`}
-                  value={draft.sources?.[key] ?? ""}
-                  onChange={(e) =>
-                    update("sources", {
-                      ...draft.sources,
-                      [key]: e.target.value,
-                    })
-                  }
-                />
-              </label>
             </article>
           ))}
         </section>
@@ -159,7 +127,7 @@ export default function BearingDataPage({
           <div>
             <span>{t("theoretical")} k</span>
             <strong>
-              {theoretical?.toFixed(6) ?? "—"} · {t("ESTIMATED")}
+              {theoretical?.toFixed(6) ?? "—"}
             </strong>
           </div>
           <div>
