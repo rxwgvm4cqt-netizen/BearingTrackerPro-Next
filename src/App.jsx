@@ -500,10 +500,12 @@ export default function App() {
       onLanguageChange={(value) => update((d) => ({ ...d, language: value }))}
       onPageChange={(value) => {
         if (dataRef.current.session.jogDirection !== 0) stop();
+        setMessage("");
         setPage(value);
       }}
       t={t}
     >
+      {page !== "tracking" && (
       <div className="case-toolbar">
         <span className="offline-state">{t(offline)}</span>
         <button className="control-button" onClick={saveCase}>
@@ -535,6 +537,8 @@ export default function App() {
         />
         <output role="status">{message}</output>
       </div>
+      )}
+      {page === "tracking" && message && <output role="status">{message}</output>}
       {session.mode === "ocr" && (
         <div className="camera-dock">
           <CameraRPMPanel
