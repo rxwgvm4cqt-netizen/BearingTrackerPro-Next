@@ -58,10 +58,18 @@ try {
   page.on("pageerror", (e) => failures.push(e.message));
   await page.goto(url, { waitUntil: "networkidle" });
   await page.getByTestId("rotor-dial").waitFor();
+  for (const key of ["saveCase", "export", "import"]) {
+    assert.equal(await page.getByRole("button", { name: t(key), exact: true }).count(), 0);
+  }
+  await page.getByRole("button", { name: t("analysis"), exact: true }).click();
+  for (const key of ["saveCase", "export", "import"]) {
+    assert.equal(await page.getByRole("button", { name: t(key), exact: true }).count(), 1);
+  }
   await page
     .getByText(t("offlineReady"), { exact: true })
     .waitFor({ timeout: 30000 });
-  console.log("PASS: initial app + complete offline package");
+  await page.getByRole("button", { name: t("tracking"), exact: true }).click();
+  console.log("PASS: tracking has no case toolbar; save and backup remain on analysis; complete offline package");
   const metricBox = await page.locator(".tracking-metrics").boundingBox();
   const rotorBox = await page.getByTestId("rotor-dial").boundingBox();
   assert.ok(metricBox.x + metricBox.width <= rotorBox.x);
@@ -143,6 +151,7 @@ try {
   await page.waitForTimeout(150);
   assert.equal(parseFloat(await value(t("rotorTurns"))), coastEnd);
   console.log("PASS: manual turbine stop slows over 2.5 turns; repeat stop preserves braking distance");
+  await button(t("analysis")).click();
   await button(t("saveCase")).click();
   const before = (await readState()).session;
   console.log(
