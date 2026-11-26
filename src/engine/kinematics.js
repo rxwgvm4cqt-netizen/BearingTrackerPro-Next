@@ -156,3 +156,31 @@ export function integrateRpm(state, rpm, elapsedMs, presets, source) {
     { outer: state.outerRunning, cage: state.cageRunning },
   );
 }
+
+// Constant deceleration: integral of RPM reaches exactly 2.5 rotor turns.
+// This is an app simulation, not a measured turbine braking curve.
+export function beginManualCoast(state) {
+  if (state.coast) return state;
+  if (state.mode !== "manual" || (!state.outerRunning && !state.cageRunning) || !(state.manualRpm > 0))
+    return { ...state, coast: null, outerRunning: false, cageRunning: false, jogDirection: 0 };
+  const speed = state.manualRpm * 360 / 60000;
+  return { ...state, jogDirection: 0,
+    sync: state.sync === "synced" ? "uncertain" : state.sync,
+    coast: { elapsed: 0, duration: 1800 / speed, speed,
+      sign: state.direction === "cw" ? 1 : -1 } };
+}
+
+export function integrateManualCoast(state, elapsedMs, presets) {
+  if (state.mode !== "manual" || !state.coast || !Number.isFinite(elapsedMs) || elapsedMs <= 0) return state;
+  const c = state.coast;
+  const next = Math.min(c.duration, c.elapsed + elapsedMs);
+  const distance = (time) => c.speed * time * (1 - time / (2 * c.duration));
+  const preset = presets.find(p => p.id === state.selectedPresetId);
+  const view = preset?.viewingDirection === "generator" ? -1 : 1;
+  const advanced = advanceAngles(state, (distance(next) - distance(c.elapsed)) * c.sign * view, presets,
+    { outer: state.outerRunning, cage: state.cageRunning });
+  const done = next >= c.duration;
+  return { ...advanced, coast: done ? null : { ...c, elapsed: next },
+    outerRunning: done ? false : state.outerRunning,
+    cageRunning: done ? false : state.cageRunning };
+}
