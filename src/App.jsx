@@ -26,7 +26,7 @@ import { STATIC_LOGIN } from "./config/auth.js";
 import "./styles/app.css";
 import "./styles/next.css";
 
-const OCR_MAX_AGE_MS = 6500;
+import { getOcrSignal, OCR_MAX_AGE_MS } from "./utils/ocrRpm.js";
 export default function App() {
   const [data, setData] = useState(load);
   const dataRef = useRef(data);
@@ -35,6 +35,7 @@ export default function App() {
   const [message, setMessage] = useState("");
   const [offline, setOffline] = useState("offlineLoading");
   const [ocrRpm, setOcrRpm] = useState(null);
+  const [ocrSignal, setOcrSignal] = useState("ocrWaiting");
   const rpmRef = useRef(null);
   const importRef = useRef(null);
   const { presets, session, language, calibrations } = data;
@@ -159,9 +160,10 @@ export default function App() {
       positioning: false,
     });
   };
-  const stableRpm = useCallback((value) => {
+  const stableRpm = useCallback((value, measurement) => {
     if (dataRef.current.session.mode !== "ocr") return;
-    rpmRef.current = { value, timestamp: performance.now() };
+    rpmRef.current = { value, timestamp: measurement?.timestamp ?? performance.now() };
+    setOcrSignal(getOcrSignal(rpmRef.current, performance.now()).status);
     setOcrRpm(value);
   }, []);
   const stopOcr = useCallback(() => {
@@ -169,6 +171,17 @@ export default function App() {
     setOcrRpm(null);
     if (dataRef.current.session.mode === "ocr") interrupt();
   }, [interrupt]);
+
+  useEffect(() => {
+    if (session.mode !== "ocr") return;
+    const updateSignal = () => {
+      const signal = getOcrSignal(rpmRef.current, performance.now());
+      setOcrSignal(signal.status);
+      if (signal.status === "ocrLost" || signal.status === "ocrWaiting") setOcrRpm(null);
+    };
+    const timer = setInterval(updateSignal, 250);
+    return () => clearInterval(timer);
+  }, [session.mode]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -241,24 +254,17 @@ export default function App() {
               d.presets,
             ),
           };
-        const fresh =
-          rpmRef.current && now - rpmRef.current.timestamp <= OCR_MAX_AGE_MS;
-        if (s.mode === "ocr" && !fresh)
-          return {
-            ...d,
-            session: {
-              ...s,
-              coast: null,
-              outerRunning: false,
-              cageRunning: false,
-              sync: "uncertain",
-            },
-          };
+        const input = getOcrSignal(rpmRef.current, now);
+        if (s.mode === "ocr" && (input.status === "ocrLost" || input.status === "ocrWaiting"))
+          // Freeze integration while retaining the user's run intent. A fresh measured
+          // value resumes it; Stop/mode change still clears that intent explicitly.
+          return s.sync === "uncertain" ? d : { ...d, session: { ...s, sync: "uncertain" } };
         const rpm =
-          s.mode === "manual" ? s.manualRpm : (rpmRef.current?.value ?? 0);
+          s.mode === "manual" ? s.manualRpm : input.rpm;
         // Kinematic angles are stored in rotor-side coordinates; input direction is viewed.
         const canonical = {
           ...s,
+          ...(s.mode === "ocr" && input.status === "ocrHeld" ? { sync: "uncertain" } : {}),
           direction:
             view === 1 ? s.direction : s.direction === "cw" ? "ccw" : "cw",
         };
@@ -543,6 +549,7 @@ export default function App() {
         <div className="camera-dock">
           <CameraRPMPanel
             rpm={ocrRpm === null ? "—" : ocrRpm.toFixed(2)}
+            signal={ocrSignal}
             onStableRpm={stableRpm}
             onOcrStop={stopOcr}
             t={t}
