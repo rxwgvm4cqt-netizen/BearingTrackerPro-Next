@@ -94,3 +94,8 @@ test("English view and generator-side view render", () => {
   assert.ok(html.includes("Manual RPM"));
   assert.ok(html.includes("Symbolic rollers"));
 });
+
+test("references and known movement appear only on analysis", () => {
+  assert.ok(!renderToString(createElement(Tracking, props())).includes("Referenzierung &amp; bekannte Bewegung"));
+  assert.ok(renderToString(createElement(Analysis, props())).includes("Referenzierung &amp; bekannte Bewegung"));
+});

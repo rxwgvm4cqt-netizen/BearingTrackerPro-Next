@@ -72,7 +72,9 @@ try {
       .innerText();
   const readState = () =>
     page.evaluate((key) => JSON.parse(localStorage.getItem(key)), storageKey);
+  await button(t("analysis")).click();
   await button(t("reference")).click();
+  await button(t("tracking")).click();
   const dial = page.getByTestId("rotor-dial");
   await dial.scrollIntoViewIfNeeded();
   const box = await dial.boundingBox();
@@ -119,7 +121,21 @@ try {
   await page.locator("input[name=manualRpm]").fill("1");
   await page.waitForTimeout(200);
   assert.ok(parseFloat(await value(t("rotorTurns"))) > moving);
+  await button(t("combined")).click();
+  await page.locator("input[name=manualRpm]").fill("30");
+  await button(t("combined")).click();
+  await page.waitForTimeout(100);
   await button(t("stopApp")).click();
+  const coastStart = parseFloat(await value(t("rotorTurns")));
+  await page.getByText(t("coasting"), { exact: true }).waitFor();
+  await page.waitForTimeout(250);
+  await button(t("stopApp")).click();
+  await page.getByText(t("coasting"), { exact: true }).waitFor({ state: "hidden", timeout: 15000 });
+  const coastEnd = parseFloat(await value(t("rotorTurns")));
+  assert.ok(Math.abs(Math.abs(coastEnd - coastStart) - 2.5) < 0.02);
+  await page.waitForTimeout(150);
+  assert.equal(parseFloat(await value(t("rotorTurns"))), coastEnd);
+  console.log("PASS: manual turbine stop slows over 2.5 turns; repeat stop preserves braking distance");
   await button(t("saveCase")).click();
   const before = (await readState()).session;
   console.log(
