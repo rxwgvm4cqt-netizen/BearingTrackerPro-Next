@@ -73,8 +73,11 @@ try {
   const readState = () =>
     page.evaluate((key) => JSON.parse(localStorage.getItem(key)), storageKey);
   await button(t("reference")).click();
-  const dial = page.getByTestId("rotor-dial"),
-    box = await dial.boundingBox();
+  const dial = page.getByTestId("rotor-dial");
+  await dial.scrollIntoViewIfNeeded();
+  const box = await dial.boundingBox();
+  await page.screenshot({ path: "test-results/input-ready.png", fullPage: true });
+  console.log("Dial viewport", box);
   const cx = box.x + box.width / 2,
     cy = box.y + box.height / 2,
     r = box.width * 0.36;
