@@ -6,6 +6,10 @@ const copy = {
   finger: ["Finger Tracking", "Finger Tracking"],
   manual: ["Manuelle RPM", "Manual RPM"],
   ocr: ["Kamera OCR", "Camera OCR"],
+  ocrWaiting: ["Warte auf bestätigte RPM", "Waiting for confirmed RPM"],
+  ocrLive: ["Aktueller OCR-Messwert", "Current OCR measurement"],
+  ocrHeld: ["Kurze Leselücke · letzter Messwert wird weiterverwendet", "Brief reading gap · holding last measurement"],
+  ocrLost: ["OCR-Signal fehlt · Berechnung pausiert bis zur nächsten bestätigten Messung", "OCR signal lost · calculation paused until the next confirmed measurement"],
   fingerHint: [
     "Rotorblatt mit dem Finger greifen und nachführen. Beim Aufsetzen bleibt die Position erhalten.",
     "Drag any blade to follow the real rotor. Touching down does not change the position.",
