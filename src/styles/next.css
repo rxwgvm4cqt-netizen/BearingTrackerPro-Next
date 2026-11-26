@@ -195,6 +195,13 @@ button:disabled {
   user-select: none;
   -webkit-user-select: none;
 }
+.tracking-visual-column {
+  justify-items: center;
+  align-content: start;
+}
+.tracking-visual-column .rotor-dial {
+  width: min(100%, 65svh);
+}
 .rotor-dial svg.touch-enabled {
   touch-action: none;
   cursor: grab;
