@@ -124,6 +124,7 @@ export function validateArchive(raw, resumed = false) {
     language: raw.language === "en" ? "en" : "de",
     session: {
       ...s,
+      coast: null,
       outerRunning: false,
       cageRunning: false,
       jogDirection: 0,
