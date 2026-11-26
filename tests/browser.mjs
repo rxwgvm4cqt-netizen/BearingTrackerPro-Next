@@ -28,7 +28,7 @@ try {
           ctx.font = "80px Arial";
           ctx.textAlign = "center";
           ctx.textBaseline = "middle";
-          ctx.fillText("9.87 RPM", 640, 360);
+          ctx.fillText(window.__btpTestRpmText ?? "9.87 RPM", 640, 360);
         };
         draw();
         const timer = setInterval(draw, 100);
@@ -205,7 +205,39 @@ try {
     { timeout: 30000 },
   );
   await button(t("combined")).click();
+  const turnValue = async () => parseFloat(await value(t("rotorTurns")));
+  const beforeGap = await turnValue();
+  await page.evaluate(() => { window.__btpTestRpmText = ""; });
+  await page.waitForTimeout(1100);
+  assert.ok(Math.abs(await turnValue() - beforeGap) > 0.01);
+  const transitionStart = Date.now();
+  await page.evaluate(() => { window.__btpTestRpmText = "12.34 RPM"; });
+  await page.waitForFunction(() => document.querySelector(".camera-rpm-panel strong")?.textContent === "12.34", null, {timeout:4000});
+  assert.ok(Math.abs(await turnValue() - beforeGap) > 0.02);
+  console.log(`PASS: 9.87 to 12.34 RPM with brief blank, continuous motion; new value in ${Date.now()-transitionStart}ms`);
+  await page.evaluate(() => { window.__btpTestRpmText = ""; });
+  await page.getByText(t("ocrHeld"),{exact:true}).waitFor({timeout:4000});
+  await page.getByText(t("ocrLost"),{exact:true}).waitFor({timeout:9000});
+  const frozen = await turnValue();
+  await page.waitForTimeout(300);
+  assert.equal(await turnValue(),frozen);
+  await page.evaluate(() => { window.__btpTestRpmText = "9.87 RPM"; });
+  await page.waitForFunction(() => document.querySelector(".camera-rpm-panel strong")?.textContent === "9.87", null, {timeout:4000});
   await page.waitForTimeout(200);
+  assert.ok(Math.abs(await turnValue()-frozen)>0.01);
+  console.log("PASS: stale signal pauses, fresh confirmed value resumes without resetting angles");
+  await button(t("stopApp")).click();
+  const stopped = await turnValue();
+  await page.evaluate(() => { window.__btpTestRpmText = "12.34 RPM"; });
+  await page.waitForFunction(() => document.querySelector(".camera-rpm-panel strong")?.textContent === "12.34", null, {timeout:4000});
+  assert.equal(await turnValue(),stopped);
+  await button(t("combined")).click();
+  await page.evaluate(() => { window.__btpTestRpmText = "0.00 RPM"; });
+  await page.waitForFunction(() => document.querySelector(".camera-rpm-panel strong")?.textContent === "0.00", null, {timeout:4000});
+  const zero = await turnValue();await page.waitForTimeout(250);assert.equal(await turnValue(),zero);
+  await page.evaluate(() => { window.__btpTestRpmText = "9.87 RPM"; });
+  await page.waitForFunction(() => document.querySelector(".camera-rpm-panel strong")?.textContent === "9.87", null, {timeout:4000});
+  console.log("PASS: explicit Stop prevents auto-restart; confirmed zero stops motion immediately");
   await button(t("analysis")).click();
   await page.waitForTimeout(2000);
   assert.equal(
