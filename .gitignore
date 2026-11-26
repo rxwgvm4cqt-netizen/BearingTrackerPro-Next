@@ -1,0 +1,15 @@
+node_modules/
+dist/
+private/
+*.pdf
+*.traineddata
+playwright-report/
+test-results/
+.DS_Store
+.test-runtime/
+public/ocr/core/
+public/ocr/worker.min.js
+public/ocr/TESSERACT-LICENSE
+public/ocr/CORE-LICENSE
+public/icons/
+BearingTrackerPro.html
