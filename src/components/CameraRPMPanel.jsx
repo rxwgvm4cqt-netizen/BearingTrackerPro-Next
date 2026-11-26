@@ -1,9 +1,11 @@
-import { useEffect, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import { captureFrameForOCR } from "../utils/captureFrame.js";
 import { PSM, createWorker } from "tesseract.js";
 import {
   getRpmCandidatesFromText,
-  getStableRpmValue,
+  createRpmConfirmation,
+  nextOcrDelay,
+  OCR_MAX_AGE_MS,
   parseRpmFromText,
 } from "../utils/ocrRpm";
 
@@ -14,7 +16,6 @@ const CAMERA_STATUS = {
   MOCK: "mock",
 };
 
-const OCR_INTERVAL_MS = 1800;
 const OCR_WHITELIST = "0123456789.,RPM rpm";
 
 const OCR_STATUS = {
@@ -60,12 +61,12 @@ function getVideoConstraints(deviceId) {
   };
 }
 
-function CameraRPMPanel({ onOcrStop, onStableRpm, rpm, t }) {
+function CameraRPMPanel({ onOcrStop, onStableRpm, rpm, signal, t }) {
   const videoRef = useRef(null);
   const ocrCanvasRef = useRef(null);
   const ocrActiveRef = useRef(false);
   const ocrJobRunningRef = useRef(false);
-  const ocrSamplesRef = useRef([]);
+  const confirmationRef = useRef(createRpmConfirmation());
   const ocrTimerRef = useRef(null);
   const ocrWorkerRef = useRef(null);
   const ocrWorkerPromiseRef = useRef(null);
@@ -85,6 +86,7 @@ function CameraRPMPanel({ onOcrStop, onStableRpm, rpm, t }) {
   const [selectedDeviceId, setSelectedDeviceId] = useState("");
   const [deviceListMessage, setDeviceListMessage] = useState("");
   const [deviceListScanned, setDeviceListScanned] = useState(false);
+  const [ocrActive, setOcrActive] = useState(false);
   const [ocrCandidates, setOcrCandidates] = useState([]);
   const [ocrError, setOcrError] = useState("");
   const [ocrDurationMs, setOcrDurationMs] = useState(null);
@@ -146,7 +148,7 @@ function CameraRPMPanel({ onOcrStop, onStableRpm, rpm, t }) {
 
   const clearOcrTimer = () => {
     if (ocrTimerRef.current) {
-      window.clearInterval(ocrTimerRef.current);
+      window.clearTimeout(ocrTimerRef.current);
       ocrTimerRef.current = null;
     }
   };
@@ -197,9 +199,10 @@ function CameraRPMPanel({ onOcrStop, onStableRpm, rpm, t }) {
   const stopOcr = async ({ resetToMock = true } = {}) => {
     generationRef.current += 1;
     ocrActiveRef.current = false;
+    setOcrActive(false);
     ocrJobRunningRef.current = false;
     clearOcrTimer();
-    ocrSamplesRef.current = [];
+    confirmationRef.current = createRpmConfirmation();
     stableOcrRpmRef.current = null;
     setOcrCandidates([]);
     setOcrDurationMs(null);
@@ -220,13 +223,13 @@ function CameraRPMPanel({ onOcrStop, onStableRpm, rpm, t }) {
     }
   };
 
-  const scheduleOcrPass = () => {
+  const scheduleOcrPass = (durationMs = 0) => {
     clearOcrTimer();
-    ocrTimerRef.current = window.setInterval(() => {
-      if (!ocrJobRunningRef.current) {
-        void runOcrPass();
-      }
-    }, OCR_INTERVAL_MS);
+    if (!ocrActiveRef.current || !mountedRef.current) return;
+    ocrTimerRef.current = window.setTimeout(() => {
+      ocrTimerRef.current = null;
+      void runOcrPass();
+    }, nextOcrDelay(durationMs));
   };
 
   async function runOcrPass() {
@@ -255,6 +258,7 @@ function CameraRPMPanel({ onOcrStop, onStableRpm, rpm, t }) {
         !mountedRef.current
       )
         return;
+      const capturedAt = performance.now();
       const frame = captureFrameForOCR(
         videoRef.current,
         ocrCanvasRef.current,
@@ -277,14 +281,13 @@ function CameraRPMPanel({ onOcrStop, onStableRpm, rpm, t }) {
       setOcrRpm(parsedRpm);
 
       if (parsedRpm === null) {
-        ocrSamplesRef.current = [];
+        confirmationRef.current.push(null, capturedAt);
         setOcrStatus(OCR_STATUS.RUNNING);
         setOcrPlausibility("ocrUncertain");
       } else {
-        const nextSamples = [...ocrSamplesRef.current, parsedRpm].slice(-3);
-        const stableRpm = getStableRpmValue(nextSamples);
-
-        ocrSamplesRef.current = nextSamples;
+        const stableRpm = performance.now() - capturedAt <= OCR_MAX_AGE_MS
+          ? confirmationRef.current.push(parsedRpm, capturedAt)
+          : confirmationRef.current.push(null, capturedAt);
 
         if (stableRpm === null) {
           setOcrStatus(OCR_STATUS.RUNNING);
@@ -295,7 +298,7 @@ function CameraRPMPanel({ onOcrStop, onStableRpm, rpm, t }) {
           stableOcrRpmRef.current = stableRpm;
           setStableOcrRpm(stableRpm);
           setOcrRpm(stableRpm);
-          stableCallbackRef.current?.(stableRpm);
+          stableCallbackRef.current?.(stableRpm, { timestamp: capturedAt });
         }
       }
 
@@ -308,6 +311,7 @@ function CameraRPMPanel({ onOcrStop, onStableRpm, rpm, t }) {
       if (generation === generationRef.current && mountedRef.current) {
         setOcrDurationMs(Math.round(performance.now() - startedAt));
         ocrJobRunningRef.current = false;
+        scheduleOcrPass(performance.now() - startedAt);
       }
     }
   }
@@ -419,9 +423,11 @@ function CameraRPMPanel({ onOcrStop, onStableRpm, rpm, t }) {
       return;
     }
 
+    if (ocrActiveRef.current) return;
     ocrActiveRef.current = true;
+    setOcrActive(true);
     stableOcrRpmRef.current = null;
-    ocrSamplesRef.current = [];
+    confirmationRef.current = createRpmConfirmation();
     setOcrCandidates([]);
     setOcrDurationMs(null);
     setOcrError("");
@@ -430,7 +436,6 @@ function CameraRPMPanel({ onOcrStop, onStableRpm, rpm, t }) {
     setStableOcrRpm(null);
     setOcrPlausibility("ocrUncertain");
     setOcrStatus(OCR_STATUS.RUNNING);
-    scheduleOcrPass();
     void runOcrPass();
   };
 
@@ -445,7 +450,7 @@ function CameraRPMPanel({ onOcrStop, onStableRpm, rpm, t }) {
       generationRef.current += 1;
       cameraGenerationRef.current += 1;
       ocrActiveRef.current = false;
-      clearInterval(ocrTimerRef.current);
+      clearTimeout(ocrTimerRef.current);
       ocrTimerRef.current = null;
       streamRef.current?.getTracks().forEach((track) => track.stop());
       streamRef.current = null;
@@ -507,6 +512,7 @@ function CameraRPMPanel({ onOcrStop, onStableRpm, rpm, t }) {
           />
         </div>
         <strong>{rpm}</strong>
+        <span className="camera-rpm-panel__hint" role="status">{t(signal ?? "ocrWaiting")}</span>
         <div className="camera-rpm-panel__actions">
           <button
             disabled={cameraStatus === CAMERA_STATUS.LIVE}
@@ -553,7 +559,7 @@ function CameraRPMPanel({ onOcrStop, onStableRpm, rpm, t }) {
         <div className="camera-rpm-panel__ocr-controls">
           <button
             disabled={
-              cameraStatus !== CAMERA_STATUS.LIVE || ocrActiveRef.current
+              cameraStatus !== CAMERA_STATUS.LIVE || ocrActive
             }
             type="button"
             onClick={handleStartOcr}
@@ -561,7 +567,7 @@ function CameraRPMPanel({ onOcrStop, onStableRpm, rpm, t }) {
             {t("ocrStart")}
           </button>
           <button
-            disabled={!ocrActiveRef.current}
+            disabled={!ocrActive}
             type="button"
             onClick={handleStopOcr}
           >
@@ -612,4 +618,5 @@ function CameraRPMPanel({ onOcrStop, onStableRpm, rpm, t }) {
   );
 }
 
-export default CameraRPMPanel;
+// Rotor animation updates at frame rate; the camera panel only needs new OCR/UI props.
+export default memo(CameraRPMPanel);

@@ -115,3 +115,38 @@ export function getStableRpmValue(values, tolerance = STABLE_RPM_TOLERANCE) {
     ? (latest + previous) / 2
     : null;
 }
+
+// Never queue camera frames: after one job, leave time for rendering before the next.
+export const OCR_SAMPLE_PERIOD_MS = 400;
+export const OCR_MAX_AGE_MS = 6500;
+export const OCR_HOLD_AFTER_MS = 1500;
+export function nextOcrDelay(durationMs) {
+  return Math.max(80, OCR_SAMPLE_PERIOD_MS - Math.max(0, durationMs));
+}
+
+export function createRpmConfirmation() {
+  let previous = null;
+  return {
+    push(value, capturedAt) {
+      if (!isPlausibleRpm(value) || !Number.isFinite(capturedAt)) {
+        previous = null;
+        return null;
+      }
+      const agrees = previous && capturedAt > previous.time &&
+        capturedAt - previous.time <= 2500 &&
+        Math.abs(value - previous.value) <= STABLE_RPM_TOLERANCE;
+      previous = { value, time: capturedAt };
+      // Use the newest corroborated measurement, without averaging in older RPM.
+      return agrees ? value : null;
+    },
+  };
+}
+
+export function getOcrSignal(sample, now) {
+  if (!sample || !isPlausibleRpm(sample.value) || !Number.isFinite(sample.timestamp) ||
+      !Number.isFinite(now) || now < sample.timestamp)
+    return { status: "ocrWaiting", rpm: 0 };
+  const age = now - sample.timestamp;
+  if (age > OCR_MAX_AGE_MS) return { status: "ocrLost", rpm: 0 };
+  return { status: age > OCR_HOLD_AFTER_MS ? "ocrHeld" : "ocrLive", rpm: sample.value };
+}
