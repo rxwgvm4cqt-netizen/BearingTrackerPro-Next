@@ -50,6 +50,10 @@ test("initial application renders immediately without a login gate", () => {
   assert.ok(html.includes("Finger Tracking"));
   assert.ok(html.includes("Presets bearbeiten"));
   assert.ok(!html.includes("login-form"));
+  assert.ok(!html.includes("case-toolbar"));
+  assert.ok(!html.includes("Fall speichern"));
+  assert.ok(!html.includes("Backup exportieren"));
+  assert.ok(!html.includes("Backup importieren"));
 });
 test("preset editor keeps editable numbers and save while hiding quality and sources", () => {
   const html = renderToString(createElement(Preset, props()));
