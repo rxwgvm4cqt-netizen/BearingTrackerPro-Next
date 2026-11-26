@@ -6,6 +6,8 @@ import TrackingPage from "./pages/TrackingPage.jsx";
 import AnalysisPage from "./pages/AnalysisPage.jsx";
 import BearingDataPage from "./pages/BearingDataPage.jsx";
 import {
+  beginManualCoast,
+  integrateManualCoast,
   activeFactor,
   advanceAngles,
   createSession,
@@ -54,6 +56,7 @@ export default function App() {
         ...d,
         session: {
           ...d.session,
+          coast: null,
           outerRunning: false,
           cageRunning: false,
           jogDirection: 0,
@@ -68,12 +71,16 @@ export default function App() {
       })),
     [update],
   );
+  const stopWithCoast = () => update((d) => ({
+    ...d, session: beginManualCoast(d.session),
+  }));
   const interrupt = useCallback(
     () =>
       update((d) => ({
         ...d,
         session: {
           ...d.session,
+          coast: null,
           outerRunning: false,
           cageRunning: false,
           jogDirection: 0,
@@ -145,6 +152,7 @@ export default function App() {
     setOcrRpm(null);
     change({
       mode,
+      coast: null,
       outerRunning: false,
       cageRunning: false,
       jogDirection: 0,
@@ -215,12 +223,15 @@ export default function App() {
             ...d,
             session: {
               ...s,
+              coast: null,
               outerRunning: false,
               cageRunning: false,
               jogDirection: 0,
               sync: "uncertain",
             },
           };
+        if (s.mode === "manual" && s.coast)
+          return { ...d, session: integrateManualCoast(s, elapsed, d.presets) };
         if (s.jogDirection !== 0)
           return {
             ...d,
@@ -237,6 +248,7 @@ export default function App() {
             ...d,
             session: {
               ...s,
+              coast: null,
               outerRunning: false,
               cageRunning: false,
               sync: "uncertain",
@@ -317,6 +329,7 @@ export default function App() {
       return;
     }
     change({
+      coast: null,
       outerRunning: which !== "cage" || s.outerRunning,
       cageRunning: which !== "outer" || s.cageRunning,
       jogDirection: 0,
@@ -351,6 +364,7 @@ export default function App() {
         ...d.session,
         rotorAngle:
           rotor - ["A", "B", "C"].indexOf(d.session.referenceBlade) * 120,
+        coast: null,
         outerRunning: false,
         cageRunning: false,
         jogDirection: 0,
@@ -544,7 +558,8 @@ export default function App() {
           onDelta={onDelta}
           onInterrupt={interrupt}
           onStart={start}
-          onStop={stop}
+          onStop={session.mode === "manual" ? stopWithCoast : stop}
+          onPause={stop}
           onReset={() => {
             if (window.confirm(t("resetConfirm")))
               update((d) => ({
@@ -559,6 +574,15 @@ export default function App() {
               }));
           }}
           onDefect={defect}
+          t={t}
+        />
+      )}
+      {page === "analysis" && (
+        <AnalysisPage
+          key={preset.id}
+          session={session}
+          preset={preset}
+          onChange={change}
           onReference={reference}
           onKnownTurns={(turns) => {
             if (Number.isFinite(turns))
@@ -567,6 +591,7 @@ export default function App() {
                 session: advanceAngles(
                   {
                     ...d.session,
+                    coast: null,
                     outerRunning: false,
                     cageRunning: false,
                     jogDirection: 0,
@@ -577,14 +602,6 @@ export default function App() {
               }));
           }}
           onConfirmSync={() => change({ sync: "synced" })}
-          t={t}
-        />
-      )}
-      {page === "analysis" && (
-        <AnalysisPage
-          key={preset.id}
-          session={session}
-          preset={preset}
           calibrations={calibrations}
           onCalibration={calibration}
           onApplyCalibration={applyCalibration}
