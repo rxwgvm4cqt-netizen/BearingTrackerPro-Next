@@ -1,4 +1,3 @@
-import { useState } from "react";
 import RotorDial from "../components/RotorDial.jsx";
 import KPIBox from "../components/KPIBox.jsx";
 import { activeFactor, normalizeAngle } from "../engine/kinematics.js";
@@ -68,21 +67,12 @@ export default function TrackingPage({
   onStop,
   onReset,
   onDefect,
-  onReference,
-  onKnownTurns,
-  onConfirmSync,
+  onPause,
   t,
 }) {
   const row = session.rows[preset.id];
   const view = preset.viewingDirection === "generator" ? -1 : 1;
   const factor = activeFactor(preset);
-  const [refs, setRefs] = useState({
-    rotor: String(session.rotorAngle * view),
-    roller: String(row.angle * view),
-    inspection: String(row.inspectionAngle * view),
-    turns: "0",
-  });
-  const patch = (key, value) => setRefs((p) => ({ ...p, [key]: value }));
   const running = session.outerRunning || session.cageRunning;
   const canJog =
     session.positioning &&
@@ -130,7 +120,9 @@ export default function TrackingPage({
           <p className="dial-help">
             {session.mode === "finger"
               ? t("fingerHint")
-              : running
+              : session.coast
+                ? t("coastingHint")
+                : running
                 ? t("live")
                 : t("startPaused")}
           </p>
@@ -138,14 +130,14 @@ export default function TrackingPage({
         <section className="tracking-main-actions">
           <button
             className="primary-action-button primary-action-button--start"
-            disabled={session.mode === "finger" || factor === null}
+            disabled={session.mode === "finger" || factor === null || !!session.coast}
             onClick={() => onStart("outer")}
           >
             {t("startOuter")}
           </button>
           <button
             className="primary-action-button primary-action-button--start"
-            disabled={session.mode === "finger" || factor === null}
+            disabled={session.mode === "finger" || factor === null || !!session.coast}
             onClick={() => onStart("cage")}
           >
             {t("startRoller")}
@@ -155,6 +147,7 @@ export default function TrackingPage({
             onClick={onStop}
           >
             {t("stopApp")}
+            {session.coast && <small style={{ display: "block" }}>{t("coasting")}</small>}
           </button>
         </section>
         <aside className="tracking-side-panel">
@@ -191,6 +184,7 @@ export default function TrackingPage({
               <span>{t("manual")}</span>
               <input
                 name="manualRpm"
+                disabled={!!session.coast}
                 type="number"
                 min="0"
                 max="30"
@@ -212,6 +206,7 @@ export default function TrackingPage({
           <label className="field">
             <span>{t("direction")}</span>
             <select
+              disabled={!!session.coast}
               value={session.direction}
               onChange={(e) => onChange({ direction: e.target.value })}
             >
@@ -229,8 +224,8 @@ export default function TrackingPage({
           <div className="motion-controls">
             <button
               className="control-button control-button--combined"
-              disabled={session.mode === "finger" || factor === null}
-              onClick={() => (running ? onStop() : onStart("both"))}
+              disabled={session.mode === "finger" || factor === null || !!session.coast}
+              onClick={() => (running ? onPause() : onStart("both"))}
             >
               {t("combined")}
             </button>
@@ -295,88 +290,7 @@ export default function TrackingPage({
           />
         ))}
       </section>
-      <details className="data-group" open={session.sync === "unreferenced"}>
-        <summary>{t("references")}</summary>
-        <p className="muted">{t("referenceHint")}</p>
-        <p className="muted">{t("angleConvention")}</p>
-        <form
-          className="editor-grid"
-          onSubmit={(e) => {
-            e.preventDefault();
-            onReference({
-              rotor: Number(refs.rotor) * view,
-              roller: Number(refs.roller) * view,
-              inspection: Number(refs.inspection) * view,
-            });
-          }}
-        >
-          {[
-            ["rotor", "rotorStart"],
-            ["roller", "rollerStart"],
-            ["inspection", "inspection"],
-          ].map(([key, label]) => (
-            <label className="field" key={key}>
-              <span>
-                {t(label)}
-                {key === "rotor" ? ` · ${session.referenceBlade}` : ""}
-              </span>
-              <input
-                name={`reference-${key}`}
-                required
-                type="number"
-                step="any"
-                value={refs[key]}
-                onChange={(e) => patch(key, e.target.value)}
-              />
-            </label>
-          ))}
-          <label className="field">
-            <span>{t("referenceBlade")}</span>
-            <select
-              value={session.referenceBlade}
-              onChange={(e) => onChange({ referenceBlade: e.target.value })}
-            >
-              {["A", "B", "C"].map((b) => (
-                <option key={b}>{b}</option>
-              ))}
-            </select>
-          </label>
-          <button
-            className="control-button control-button--combined"
-            type="submit"
-          >
-            {t("reference")}
-          </button>
-        </form>
-        <form
-          className="button-row"
-          onSubmit={(e) => {
-            e.preventDefault();
-            onKnownTurns(Number(refs.turns) * view);
-          }}
-        >
-          <label className="field">
-            <span>{t("lostTurns")}</span>
-            <input
-              required
-              type="number"
-              step="any"
-              value={refs.turns}
-              onChange={(e) => patch("turns", e.target.value)}
-            />
-          </label>
-          <button className="control-button" type="submit">
-            {t("addTurns")}
-          </button>
-          <button
-            className="control-button"
-            type="button"
-            onClick={onConfirmSync}
-          >
-            {t("confirmSync")}
-          </button>
-        </form>
-      </details>
+
     </div>
   );
 }

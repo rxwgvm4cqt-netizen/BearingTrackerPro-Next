@@ -1,3 +1,4 @@
+import References from "../components/References.jsx";
 import { useState } from "react";
 import {
   activeFactor,
@@ -12,6 +13,10 @@ export default function AnalysisPage({
   session,
   preset,
   calibrations,
+  onChange,
+  onReference,
+  onKnownTurns,
+  onConfirmSync,
   onCalibration,
   onApplyCalibration,
   onCaptureAnchor,
@@ -98,6 +103,7 @@ export default function AnalysisPage({
           {t(session.sync)}
         </span>
       </header>
+      <References session={session} preset={preset} onChange={onChange} onReference={onReference} onKnownTurns={onKnownTurns} onConfirmSync={onConfirmSync} t={t} />
       <section className="kpi-grid">
         {[
           [
