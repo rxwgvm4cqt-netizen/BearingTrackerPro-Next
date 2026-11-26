@@ -1,0 +1,64 @@
+name: Test and deploy separate Next tracker
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+concurrency:
+  group: pages-next
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Import reviewed source archive (one-time bootstrap)
+        if: hashFiles('BearingTrackerPro-Next-source.zip') != ''
+        run: |
+          unzip -o BearingTrackerPro-Next-source.zip
+          rm BearingTrackerPro-Next-source.zip
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add --all
+          git commit -m 'Import reviewed standalone BearingTrackerPro Next source'
+          git push origin HEAD:main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - name: Browser, OCR and offline regression tests
+        run: |
+          BTP_NO_OPEN=1 npm start > /tmp/btp-next-server.log 2>&1 &
+          for attempt in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:4174/ > /dev/null; then break; fi
+            sleep 1
+          done
+          npm run test:browser
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: browser-test-results
+          path: test-results
+          if-no-files-found: ignore
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy separate tracker
+        id: deployment
+        uses: actions/deploy-pages@v4
